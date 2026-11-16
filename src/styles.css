@@ -71,9 +71,11 @@ a {
   position: relative;
   width: 100%;
   max-width: 640px;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 25%);
+  box-shadow:
+    0 4px 14px rgb(0 0 0 / 20%),
+    0 1px 4px rgb(0 0 0 / 15%);
 }
 
 .side-panel {
@@ -207,18 +209,60 @@ input[type='range'] {
 
 .promotion-dialog {
   display: flex;
-  gap: 8px;
-  padding: 12px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 30%);
+}
+
+.promotion-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.promotion-options {
+  display: flex;
+  gap: 10px;
 }
 
 .promotion-option {
-  width: 56px;
-  height: 56px;
-  padding: 0;
-  font-size: 2.4rem;
-  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 76px;
+  padding: 10px 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.promotion-option img {
+  width: 44px;
+  height: 44px;
+}
+
+.promotion-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.promotion-option:hover,
+.promotion-option:focus-visible {
+  background: var(--surface);
+  border-color: var(--accent);
+  transform: translateY(-2px);
 }
 
 .app-footer {

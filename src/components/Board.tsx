@@ -3,6 +3,7 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import { Chessboard } from 'react-chessboard'
 import { kingInCheckSquare, type Color, type PromotionPiece } from '../game/gameState'
 import { PromotionDialog } from './PromotionDialog'
+import { cburnettPieces } from './pieces'
 
 export const LIGHT_SQUARE = '#eeeed2'
 export const DARK_SQUARE = '#769656'
@@ -99,6 +100,7 @@ export function Board({
           animationDurationInMs: 150,
           lightSquareStyle: { backgroundColor: LIGHT_SQUARE },
           darkSquareStyle: { backgroundColor: DARK_SQUARE },
+          pieces: cburnettPieces,
           squareStyles,
           canDragPiece: ({ piece }) =>
             canMove && piece.pieceType.startsWith(playerColor),

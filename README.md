@@ -60,3 +60,7 @@ Static site: `npm run build` produces `dist/`. Set `VITE_BASE` (for example `/ch
 ## License and Stockfish notice
 
 This app bundles and runs [Stockfish](https://stockfishchess.org/), which is licensed under the **GNU General Public License v3.0**. The WASM build comes from the [`stockfish` npm package](https://github.com/nmrugg/stockfish.js) (a port of the official engine). Stockfish source code: <https://github.com/official-stockfish/Stockfish>. Because the engine is GPLv3, distributing this app means distributing it under GPLv3-compatible terms and making the corresponding source available. The in-app "About" section repeats this notice.
+
+## Chess piece artwork
+
+The board pieces (`src/assets/pieces/*.svg`) are the classic "cburnett" set by **Colin M.L. Burnett**, sourced from Wikimedia Commons (`Chess_*t45.svg`), licensed under **CC BY-SA 3.0 / GFDL / BSD** (multi-licensed by the author). chess.com's own piece sets (e.g. "Neo") are proprietary and are not used or copied here. See <https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces> for the originals and full license terms.
