@@ -1,9 +1,28 @@
 import type { Chess, Square } from 'chess.js'
-import { useMemo, useState, type CSSProperties } from 'react'
-import { Chessboard } from 'react-chessboard'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
+import { Chessboard, defaultArrowOptions } from 'react-chessboard'
 import { kingInCheckSquare, type Color, type PromotionPiece } from '../game/gameState'
 import { PromotionDialog } from './PromotionDialog'
+import {
+  ARROW_COLORS,
+  NO_MODIFIERS,
+  highlightStyle,
+  markColorFor,
+  toggleHighlight,
+  type Highlights,
+  type Modifiers,
+} from './marks'
 import { cburnettPieces } from './pieces'
+
+const ARROW_OPTIONS = { ...defaultArrowOptions, colors: ARROW_COLORS }
+const NO_HIGHLIGHTS: Highlights = {}
 
 export const LIGHT_SQUARE = '#eeeed2'
 export const DARK_SQUARE = '#769656'
@@ -23,6 +42,11 @@ interface BoardProps {
   lastMove: { from: string; to: string } | null
   needsPromotion: (from: string, to: string) => boolean
   onMove: (from: string, to: string, promotion?: string) => boolean
+  /** Changes when a new game starts, so arrows and highlights reset even if the position did not. */
+  marksResetKey?: number
+  /** Changes when the "Clear marks" button is pressed. */
+  clearMarksSignal?: number
+  onMarksChange?: (hasMarks: boolean) => void
 }
 
 export function Board({
@@ -33,9 +57,40 @@ export function Board({
   lastMove,
   needsPromotion,
   onMove,
+  marksResetKey = 0,
+  clearMarksSignal = 0,
+  onMarksChange,
 }: BoardProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, setPending] = useState<{ from: string; to: string } | null>(null)
+  const [escapeCount, setEscapeCount] = useState(0)
+  const [arrowCount, setArrowCount] = useState(0)
+  const [drawn, setDrawn] = useState<{ owner: string; highlights: Highlights }>({
+    owner: '',
+    highlights: NO_HIGHLIGHTS,
+  })
+  const mods = useRef<Modifiers>(NO_MODIFIERS)
+
+  // Marks belong to one position and one reset: any change of either empties them.
+  const fen = game.fen()
+  const marksKey = `${marksResetKey}:${clearMarksSignal}:${escapeCount}`
+  const owner = `${fen}|${marksKey}`
+  const highlights = drawn.owner === owner ? drawn.highlights : NO_HIGHLIGHTS
+  const highlightCount = Object.keys(highlights).length
+  const hasMarks = arrowCount > 0 || highlightCount > 0
+
+  useEffect(() => {
+    onMarksChange?.(hasMarks)
+  }, [hasMarks, onMarksChange])
+
+  useEffect(() => {
+    if (!hasMarks || pending) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setEscapeCount((count) => count + 1)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [hasMarks, pending])
 
   const active =
     selected && canMove && game.get(selected as Square)?.color === playerColor ? selected : null
@@ -55,6 +110,7 @@ export function Board({
       add(lastMove.from, { backgroundColor: LAST_MOVE_BG })
       add(lastMove.to, { backgroundColor: LAST_MOVE_BG })
     }
+    for (const [square, color] of Object.entries(highlights)) add(square, highlightStyle(color))
     const check = kingInCheckSquare(game)
     if (check) add(check, { backgroundImage: CHECK_GLOW })
     if (active) add(active, { backgroundColor: SELECTED_BG })
@@ -62,7 +118,7 @@ export function Board({
       add(square, { backgroundImage: isCapture ? TARGET_RING : TARGET_DOT })
     }
     return styles
-  }, [game, lastMove, active, targets])
+  }, [game, lastMove, active, targets, highlights])
 
   const attempt = (from: string, to: string): boolean => {
     setSelected(null)
@@ -71,6 +127,24 @@ export function Board({
       return false
     }
     return onMove(from, to)
+  }
+
+  const handleSquareMouseDown = (_: unknown, event: ReactMouseEvent) => {
+    if (event.button === 2) {
+      mods.current = {
+        altKey: event.altKey,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+      }
+    } else if (event.button === 0) {
+      setDrawn({ owner, highlights: NO_HIGHLIGHTS })
+    }
+  }
+
+  const handleSquareRightClick = ({ square }: { square: string }) => {
+    const color = markColorFor(mods.current)
+    setDrawn({ owner, highlights: toggleHighlight(highlights, square, color) })
   }
 
   const handleSquareClick = ({ square }: { square: string }) => {
@@ -89,14 +163,19 @@ export function Board({
   }
 
   return (
-    <div className="board-frame">
+    <div className="board-frame" data-testid="board-frame">
       <Chessboard
+        key={marksKey}
         options={{
           id: 'board',
-          position: game.fen(),
+          position: fen,
           boardOrientation: orientation === 'w' ? 'white' : 'black',
           allowDragging: canMove,
-          allowDrawingArrows: false,
+          allowDrawingArrows: true,
+          arrowOptions: ARROW_OPTIONS,
+          clearArrowsOnClick: true,
+          clearArrowsOnPositionChange: true,
+          onArrowsChange: ({ arrows }) => setArrowCount(arrows.length),
           animationDurationInMs: 150,
           lightSquareStyle: { backgroundColor: LIGHT_SQUARE },
           darkSquareStyle: { backgroundColor: DARK_SQUARE },
@@ -110,6 +189,8 @@ export function Board({
             return attempt(sourceSquare, targetSquare)
           },
           onSquareClick: handleSquareClick,
+          onSquareMouseDown: handleSquareMouseDown,
+          onSquareRightClick: handleSquareRightClick,
         }}
       />
       {pending && (

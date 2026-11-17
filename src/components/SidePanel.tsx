@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { formatEval } from '../engine/uci'
 import { MAX_LEVEL, MIN_LEVEL } from '../engine/levels'
 import { describeStatus, type Color, type GameStatus, type MoveRow } from '../game/gameState'
+import type { ReviewState } from '../hooks/useAnalysis'
 import type { NewGameColor } from '../hooks/useChessGame'
+import { CLASS_GLYPHS, CLASS_LABELS, type MoveReview } from '../review/classify'
+import { ReviewSummary } from './ReviewSummary'
 
 interface SidePanelProps {
   rows: MoveRow[]
@@ -13,11 +17,59 @@ interface SidePanelProps {
   thinking: boolean
   canUndo: boolean
   engineError: string | null
+  review: ReviewState
+  analysisError: string | null
+  showEval: boolean
+  hasMarks: boolean
+  onShowEval: (show: boolean) => void
+  onClearMarks: () => void
+  onStartReview: () => void
+  onCancelReview: () => void
   onNewGame: (color: NewGameColor) => void
   onUndo: () => void
   onFlip: () => void
   onLevel: (level: number) => void
   onRetryEngine: () => void
+}
+
+function tooltipFor(move: MoveReview): string {
+  const label = CLASS_LABELS[move.classification]
+  const alternative = move.classification !== 'brilliant' && move.classification !== 'best'
+  if (move.bestSan && move.bestUci !== move.uci && alternative) {
+    return `${label} — best was ${move.bestSan} (${formatEval(move.evalBefore)})`
+  }
+  return label
+}
+
+interface PlyProps {
+  san: string
+  review: MoveReview | undefined
+  anyReviewed: boolean
+}
+
+function Ply({ san, review, anyReviewed }: PlyProps) {
+  const tooltip = review ? tooltipFor(review) : anyReviewed ? 'Not reviewed' : undefined
+  return (
+    <span className="ply-cell" title={tooltip}>
+      <span
+        className={review ? `ply cls-${review.classification}` : 'ply'}
+        data-testid="ply"
+        data-class={review?.classification}
+      >
+        {san}
+      </span>
+      {review && (
+        <span
+          className={`ply-icon cls-${review.classification}`}
+          data-testid="ply-icon"
+          role="img"
+          aria-label={tooltip}
+        >
+          {CLASS_GLYPHS[review.classification]}
+        </span>
+      )}
+    </span>
+  )
 }
 
 const COLOR_CHOICES: ReadonlyArray<{ value: NewGameColor; label: string }> = [
@@ -36,6 +88,14 @@ export function SidePanel({
   thinking,
   canUndo,
   engineError,
+  review,
+  analysisError,
+  showEval,
+  hasMarks,
+  onShowEval,
+  onClearMarks,
+  onStartReview,
+  onCancelReview,
   onNewGame,
   onUndo,
   onFlip,
@@ -44,6 +104,7 @@ export function SidePanel({
 }: SidePanelProps) {
   const [choice, setChoice] = useState<NewGameColor>('w')
   const listRef = useRef<HTMLOListElement>(null)
+  const anyReviewed = review.byPly.some((entry) => entry !== undefined)
 
   useEffect(() => {
     const list = listRef.current
@@ -75,6 +136,11 @@ export function SidePanel({
             </button>
           </div>
         )}
+        {analysisError && (
+          <p className="error" role="alert" data-testid="analysis-error">
+            Analysis problem: {analysisError}
+          </p>
+        )}
       </section>
 
       {over && (
@@ -90,21 +156,32 @@ export function SidePanel({
         <h2>Moves</h2>
         <ol className="move-list" ref={listRef} data-testid="move-list" tabIndex={0}>
           {rows.length === 0 && <li className="muted">No moves yet.</li>}
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <li key={row.number}>
               <span className="move-number">{row.number}.</span>
-              <span className="ply" data-testid="ply">
-                {row.white ?? '…'}
-              </span>
+              <Ply
+                san={row.white ?? '…'}
+                review={review.byPly[index * 2]}
+                anyReviewed={anyReviewed}
+              />
               {row.black !== undefined && (
-                <span className="ply" data-testid="ply">
-                  {row.black}
-                </span>
+                <Ply
+                  san={row.black}
+                  review={review.byPly[index * 2 + 1]}
+                  anyReviewed={anyReviewed}
+                />
               )}
             </li>
           ))}
         </ol>
       </section>
+
+      <ReviewSummary
+        review={review}
+        moveCount={plyCount}
+        onStart={onStartReview}
+        onCancel={onCancelReview}
+      />
 
       <section aria-label="Level">
         <label htmlFor="level">
@@ -130,6 +207,21 @@ export function SidePanel({
         <button type="button" onClick={onFlip}>
           Flip board
         </button>
+      </section>
+
+      <section aria-label="Board marks" className="marks-controls">
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={showEval}
+            onChange={(event) => onShowEval(event.target.checked)}
+          />
+          Show eval bar
+        </label>
+        <button type="button" onClick={onClearMarks} disabled={!hasMarks}>
+          Clear marks
+        </button>
+        <p className="muted small">Right-click or right-drag the board to mark squares and arrows.</p>
       </section>
 
       <section aria-label="New game">
