@@ -30,6 +30,8 @@ interface GameState {
   playerColor: Color
   level: number
   flipped: boolean
+  /** Incremented on every New game so board marks reset even when the position is identical. */
+  marksResetKey: number
 }
 
 export type EngineFactory = () => ChessEngine
@@ -58,6 +60,7 @@ function initialState(): GameState {
     playerColor: saved?.playerColor ?? 'w',
     level: saved?.level ?? DEFAULT_LEVEL,
     flipped: false,
+    marksResetKey: 0,
   }
 }
 
@@ -66,7 +69,7 @@ const defaultEngineFactory: EngineFactory = () => new StockfishClient()
 export function useChessGame(createEngine: EngineFactory = defaultEngineFactory) {
   const [state, setState] = useState<GameState>(initialState)
   const [engineError, setEngineError] = useState<string | null>(null)
-  const { game, playerColor, level, flipped } = state
+  const { game, playerColor, level, flipped, marksResetKey } = state
 
   const engineRef = useRef<ChessEngine | null>(null)
   const levelRef = useRef(level)
@@ -149,7 +152,13 @@ export function useChessGame(createEngine: EngineFactory = defaultEngineFactory)
     const color: Color = choice === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : choice
     engineRef.current?.newGame()
     setEngineError(null)
-    setState((prev) => ({ ...prev, game: createGame(), playerColor: color, flipped: false }))
+    setState((prev) => ({
+      ...prev,
+      game: createGame(),
+      playerColor: color,
+      flipped: false,
+      marksResetKey: prev.marksResetKey + 1,
+    }))
   }, [])
 
   const undo = useCallback(() => {
@@ -176,6 +185,7 @@ export function useChessGame(createEngine: EngineFactory = defaultEngineFactory)
     playerColor,
     level,
     orientation,
+    marksResetKey,
     status,
     over,
     thinking,

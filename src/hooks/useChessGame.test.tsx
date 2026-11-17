@@ -135,6 +135,15 @@ describe('useChessGame', () => {
     expect(again.result.current.level).toBe(10)
   })
 
+  it('bumps the marks reset key on every new game', () => {
+    const { result } = setup()
+    const start = result.current.marksResetKey
+    act(() => result.current.newGame('w'))
+    expect(result.current.marksResetKey).toBe(start + 1)
+    act(() => result.current.newGame('w'))
+    expect(result.current.marksResetKey).toBe(start + 2)
+  })
+
   it('reports engine failures', async () => {
     const engine = new FakeEngine()
     engine.bestMove = () => Promise.reject(new Error('no wasm'))

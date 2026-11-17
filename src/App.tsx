@@ -1,16 +1,29 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import type { AnalysisEngineFactory } from './engine/analysisEngine'
 import { Board } from './components/Board'
+import { EvalBar } from './components/EvalBar'
 import { SidePanel } from './components/SidePanel'
-import { moveRows } from './game/gameState'
+import { moveRows, type GameStatus } from './game/gameState'
+import { useAnalysis } from './hooks/useAnalysis'
 import { useChessGame, type EngineFactory } from './hooks/useChessGame'
 
 interface AppProps {
   createEngine?: EngineFactory
+  createAnalysisEngine?: AnalysisEngineFactory
 }
 
-export default function App({ createEngine }: AppProps) {
+function resultLabel(status: GameStatus): string {
+  if (status.kind !== 'checkmate') return '½-½'
+  return status.winner === 'w' ? '1-0' : '0-1'
+}
+
+export default function App({ createEngine, createAnalysisEngine }: AppProps) {
   const chess = useChessGame(createEngine)
   const { game } = chess
+  const analysis = useAnalysis(game, chess.over, createAnalysisEngine)
+  const [clearMarksSignal, setClearMarksSignal] = useState(0)
+  const [hasMarks, setHasMarks] = useState(false)
+  const clearMarks = useCallback(() => setClearMarksSignal((value) => value + 1), [])
 
   const history = useMemo(() => game.history({ verbose: true }), [game])
   const rows = useMemo(() => moveRows(game), [game])
@@ -23,15 +36,27 @@ export default function App({ createEngine }: AppProps) {
         <h1>Chess vs Stockfish</h1>
       </header>
       <main className="layout">
-        <Board
-          game={game}
-          orientation={chess.orientation}
-          playerColor={chess.playerColor}
-          canMove={chess.canMove}
-          lastMove={lastMove}
-          needsPromotion={chess.needsPromotion}
-          onMove={chess.makeMove}
-        />
+        <div className="board-area">
+          {analysis.showEval && (
+            <EvalBar
+              score={analysis.liveEval?.score ?? null}
+              orientation={chess.orientation}
+              resultLabel={chess.over ? resultLabel(chess.status) : null}
+            />
+          )}
+          <Board
+            game={game}
+            orientation={chess.orientation}
+            playerColor={chess.playerColor}
+            canMove={chess.canMove}
+            lastMove={lastMove}
+            needsPromotion={chess.needsPromotion}
+            onMove={chess.makeMove}
+            marksResetKey={chess.marksResetKey}
+            clearMarksSignal={clearMarksSignal}
+            onMarksChange={setHasMarks}
+          />
+        </div>
         <SidePanel
           rows={rows}
           plyCount={history.length}
@@ -42,6 +67,14 @@ export default function App({ createEngine }: AppProps) {
           thinking={chess.thinking}
           canUndo={chess.canUndo}
           engineError={chess.engineError}
+          review={analysis.review}
+          analysisError={analysis.analysisError}
+          showEval={analysis.showEval}
+          hasMarks={hasMarks}
+          onShowEval={analysis.setShowEval}
+          onClearMarks={clearMarks}
+          onStartReview={analysis.startReview}
+          onCancelReview={analysis.cancelReview}
           onNewGame={chess.newGame}
           onUndo={chess.undo}
           onFlip={chess.flip}
